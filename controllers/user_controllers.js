@@ -3,7 +3,8 @@ const bcrypt = require("bcrypt")
 const jwt = require('jsonwebtoken')
 require('dotenv').config()
 const Techs = require('../models/TechnologiesModel')
-
+const multer = require('multer')
+const path = require('path')
 
 exports.CreateUser = async (req, res) => {
     try {
@@ -18,7 +19,6 @@ exports.CreateUser = async (req, res) => {
         res.status(500).json({error});
     }
 }
-
 
 exports.loginController = async (req,res) => {
     const { email, password } = req.body;
@@ -85,6 +85,7 @@ exports.UpdaetUserController = async(req, res) => {
         }
     }
 }
+
 exports.GetUserProfile = async (req,res) => {
 try {
     const user = req.user;
@@ -132,6 +133,7 @@ exports.GetTechs = async (req, res) => {
         res.status(501).json({ error: error })
     }
 }
+
 exports.GetTechDetail = async (req,res) => {
     try {
         const tech_id = req.params.tech_id
@@ -163,4 +165,51 @@ exports.Search = async(req , res) => {
 
 exports.askAI = async (req, res) => {
     return res.json({ message: 'AI is not available yet' })
+}
+
+const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+      cb(null, 'uploads');
+    },
+    filename: function (req, file, cb) {
+      cb(null, `${req.params.user_id}${path.extname(file.originalname)}`);
+    },
+  });
+exports.upload = multer({
+    storage: storage,
+    limits: { fileSize: 1024 * 1024 * 10 }, // 10MB limit
+    fileFilter: function (req, file, cb) {
+      const fileTypes = /jpeg|jpg|png/;
+      const extname = fileTypes.test(path.extname(file.originalname).toLowerCase());
+      const mimetype = fileTypes.test(file.mimetype);
+  
+      if (extname && mimetype) {
+        return cb(null, true);
+      } else {
+        cb(new Error('Only images are allowed'));
+      }
+    },
+  });
+
+
+exports.uploadImage = async (req, res) => {
+try {
+    const user_id = req.params.user_id
+    const user = req.user
+    if (!req.file) {
+        return res.status(400).json({ error: 'please upload an image' })
+    }
+    if (user._id.toString() !== user_id) {
+        return res.status(401).json({ error: "not autorized" })
+    }
+      const usertoupload = await User.findByIdAndDelete(user_id , {
+        $set: {
+            image: `${user_id}${path.extname(req.file.originalname)}`
+        }  } , {new : true }).select("-password")
+    return res.status(200).json({ message: 'image uploaded succesfully', user: usertoupload })
+         
+} catch (error) {
+    console.log(error);
+    return res.status(500).json({ error: error.message })
+}
 }
